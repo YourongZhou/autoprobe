@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from urllib import error, parse, request
+from urllib import parse
 
 
 DEFAULT_URLS = [
@@ -86,13 +86,15 @@ def discover_config_path(explicit: str | None) -> Path:
 
 def discover_defaults(config_path: Path) -> dict[str, str]:
     data = parse_simple_yaml(config_path)
-    controller = data.get("external-controller", "127.0.0.1:9090")
+    controller = data.get("external-controller", "").strip()
+    controller_unix = data.get("external-controller-unix", "").strip()
     secret = data.get("secret", "")
     port = data.get("mixed-port") or data.get("socks-port") or "7890"
     proxy = f"socks5h://127.0.0.1:{port}"
     return {
         "config": str(config_path),
-        "controller": normalize_controller(controller),
+        "controller": normalize_controller(controller or "127.0.0.1:9090"),
+        "controller_unix": controller_unix,
         "secret": secret,
         "proxy": proxy,
     }
@@ -133,27 +135,47 @@ class NodeResult:
 
 
 class ClashClient:
-    def __init__(self, controller: str, secret: str | None) -> None:
+    def __init__(self, controller: str, secret: str | None, controller_unix: str | None = None) -> None:
         self.controller = controller.rstrip("/")
         self.secret = secret
+        self.controller_unix = controller_unix or None
 
     def _request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
         url = f"{self.controller}{path}"
-        body = None if payload is None else json.dumps(payload).encode("utf-8")
-        req = request.Request(url, method=method, data=body)
+        cmd = [
+            "curl",
+            "-sS",
+            "--max-time",
+            "10",
+            "-X",
+            method,
+            "-w",
+            "\n%{http_code}",
+            url,
+        ]
+        if self.controller_unix:
+            cmd[1:1] = ["--unix-socket", self.controller_unix]
         if self.secret:
-            req.add_header("Authorization", f"Bearer {self.secret}")
-        if body is not None:
-            req.add_header("Content-Type", "application/json")
+            cmd.extend(["-H", f"Authorization: Bearer {self.secret}"])
+        if payload is not None:
+            cmd.extend(["-H", "Content-Type: application/json", "--data-binary", json.dumps(payload)])
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode != 0:
+            error_text = proc.stderr.strip() or f"curl exit {proc.returncode}"
+            raise RuntimeError(f"{method} {path} failed: {error_text}")
+        body, _, status_text = proc.stdout.rpartition("\n")
         try:
-            with request.urlopen(req, timeout=10) as resp:
-                data = resp.read()
-                return None if not data else json.loads(data.decode("utf-8"))
-        except error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"{method} {path} failed: {exc.code} {detail}") from exc
-        except error.URLError as exc:
-            raise RuntimeError(f"{method} {path} failed: {exc}") from exc
+            status = int(status_text.strip())
+        except ValueError as exc:
+            raise RuntimeError(f"{method} {path} failed: could not parse HTTP status from curl output") from exc
+        if status >= 400:
+            raise RuntimeError(f"{method} {path} failed: {status} {body.strip()}")
+        if not body.strip():
+            return None
+        try:
+            return json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"{method} {path} failed: non-JSON response: {body[:200]!r}") from exc
 
     def get_selector(self, selector: str) -> dict[str, Any]:
         encoded = parse.quote(selector, safe="")
@@ -187,6 +209,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--config", default=defaults["config"], help="Clash/Mihomo/Clash Verge config path")
     parser.add_argument("--controller", default=defaults["controller"], help="Clash controller URL")
+    parser.add_argument("--controller-unix", default=defaults["controller_unix"], help="Clash controller unix socket path")
     parser.add_argument("--secret", default=defaults["secret"], help="Clash controller secret")
     parser.add_argument("--selector", default=os.environ.get("CLASH_CODEX_SELECTOR", DEFAULT_SELECTOR))
     parser.add_argument("--proxy", default=defaults["proxy"], help="Proxy URL passed to curl")
@@ -338,7 +361,7 @@ def main() -> int:
     args = parse_args()
     ensure_curl()
     urls = args.urls or DEFAULT_URLS
-    client = ClashClient(args.controller, args.secret or None)
+    client = ClashClient(args.controller, args.secret or None, args.controller_unix or None)
     selector_info = client.get_selector(args.selector)
     original = selector_info.get("now")
     candidates = choose_candidates(selector_info, args.nodes, args.top)
@@ -350,6 +373,8 @@ def main() -> int:
     print(f"Original node: {original}")
     print(f"Config: {args.config}")
     print(f"Controller: {args.controller}")
+    if args.controller_unix:
+        print(f"Controller unix socket: {args.controller_unix}")
     print(f"Proxy: {args.proxy}")
     vpn_details = detect_vpn_context(args.proxy)
     if vpn_details:
