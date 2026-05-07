@@ -48,13 +48,14 @@ Clone the repo and symlink or copy the executable into your `PATH`:
 git clone git@github.com:YourongZhou/autoprobe.git
 cd autoprobe
 chmod +x autoprobe
+mkdir -p ~/.local/bin
 ln -sf "$PWD/autoprobe" ~/.local/bin/autoprobe
 ```
 
 Optional shell alias:
 
 ```bash
-echo 'autoprobe-net() { "$HOME/.local/bin/autoprobe" "$@"; }' >> ~/.bashrc
+echo 'autoprobe() { "$HOME/.local/bin/autoprobe" "$@"; }' >> ~/.bashrc
 source ~/.bashrc
 ```
 
