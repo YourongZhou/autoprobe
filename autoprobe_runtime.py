@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import os
 import shutil
 import statistics
 import subprocess
@@ -137,7 +138,7 @@ def run_probe(proxy: str, url: str, timeout: int) -> tuple[bool, str, float, str
         "--proxy",
         proxy,
         "-o",
-        "/dev/null",
+        os.devnull,
         "-sS",
         "-w",
         "%{http_code} %{time_total}",

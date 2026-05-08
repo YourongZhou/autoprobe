@@ -42,7 +42,7 @@ If not enough nodes pass the precheck, it automatically expands to additional ca
 
 ## Install
 
-Clone the repo and symlink or copy the executable into your `PATH`:
+Linux:
 
 ```bash
 git clone git@github.com:YourongZhou/autoprobe.git
@@ -58,6 +58,25 @@ Optional shell alias:
 echo 'autoprobe() { "$HOME/.local/bin/autoprobe" "$@"; }' >> ~/.bashrc
 source ~/.bashrc
 ```
+
+macOS:
+
+```bash
+git clone git@github.com:YourongZhou/autoprobe.git
+cd autoprobe
+chmod +x autoprobe
+./autoprobe --dry-run
+```
+
+Windows PowerShell:
+
+```powershell
+git clone git@github.com:YourongZhou/autoprobe.git
+cd autoprobe
+.\autoprobe.cmd --dry-run
+```
+
+You can add the repo directory to `PATH`, or run it with `python .\autoprobe`.
 
 ## Usage
 
@@ -95,6 +114,23 @@ The script tries these paths in order:
 - `~/.local/share/io.github.clash-verge-rev.clash-verge-rev/profiles/config.yaml`
 - `~/.local/share/clash-verge/config.yaml`
 - `~/.local/share/clash-verge/profiles/config.yaml`
+- `~/Library/Application Support/clash/config.yaml`
+- `~/Library/Application Support/mihomo/config.yaml`
+- `~/Library/Application Support/ClashX/config.yaml`
+- `~/Library/Application Support/ClashX Pro/config.yaml`
+- `~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/config.yaml`
+- `~/Library/Application Support/io.github.clash-verge-rev.clash-verge-rev/profiles/config.yaml`
+- `~/Library/Application Support/clash-verge/config.yaml`
+- `~/Library/Application Support/clash-verge/profiles/config.yaml`
+- `%LOCALAPPDATA%\Clash for Windows\.config\config.yaml`
+- `%LOCALAPPDATA%\clash\config.yaml`
+- `%LOCALAPPDATA%\mihomo\config.yaml`
+- `%APPDATA%\clash\config.yaml`
+- `%APPDATA%\mihomo\config.yaml`
+- `%APPDATA%\io.github.clash-verge-rev.clash-verge-rev\config.yaml`
+- `%APPDATA%\io.github.clash-verge-rev.clash-verge-rev\profiles\config.yaml`
+- `%APPDATA%\clash-verge\config.yaml`
+- `%APPDATA%\clash-verge\profiles\config.yaml`
 
 You can always override this with `--config`.
 

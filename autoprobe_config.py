@@ -4,7 +4,61 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
+
+
+def _env_path(name: str, *parts: str) -> Path | None:
+    """Build an optional platform path from an environment variable."""
+    value = os.environ.get(name)
+    if not value:
+        return None
+    return Path(value).joinpath(*parts)
+
+
+def _default_config_candidates() -> list[Path]:
+    """Return common Clash-family config locations for Linux, macOS, and Windows."""
+    mac_app_support = Path.home() / "Library" / "Application Support"
+    candidates = [
+        Path.home() / ".config" / "clash" / "config.yaml",
+        Path.home() / ".config" / "mihomo" / "config.yaml",
+        Path.home() / ".local" / "share" / "io.github.clash-verge-rev.clash-verge-rev" / "config.yaml",
+        Path.home() / ".local" / "share" / "io.github.clash-verge-rev.clash-verge-rev" / "profiles" / "config.yaml",
+        Path.home() / ".local" / "share" / "clash-verge" / "config.yaml",
+        Path.home() / ".local" / "share" / "clash-verge" / "profiles" / "config.yaml",
+        mac_app_support / "clash" / "config.yaml",
+        mac_app_support / "mihomo" / "config.yaml",
+        mac_app_support / "ClashX" / "config.yaml",
+        mac_app_support / "ClashX Pro" / "config.yaml",
+        mac_app_support / "io.github.clash-verge-rev.clash-verge-rev" / "config.yaml",
+        mac_app_support / "io.github.clash-verge-rev.clash-verge-rev" / "profiles" / "config.yaml",
+        mac_app_support / "clash-verge" / "config.yaml",
+        mac_app_support / "clash-verge" / "profiles" / "config.yaml",
+    ]
+    windows_candidates = [
+        _env_path("LOCALAPPDATA", "Clash for Windows", ".config", "config.yaml"),
+        _env_path("LOCALAPPDATA", "clash", "config.yaml"),
+        _env_path("LOCALAPPDATA", "mihomo", "config.yaml"),
+        _env_path("APPDATA", "clash", "config.yaml"),
+        _env_path("APPDATA", "mihomo", "config.yaml"),
+        _env_path("APPDATA", "io.github.clash-verge-rev.clash-verge-rev", "config.yaml"),
+        _env_path("APPDATA", "io.github.clash-verge-rev.clash-verge-rev", "profiles", "config.yaml"),
+        _env_path("APPDATA", "clash-verge", "config.yaml"),
+        _env_path("APPDATA", "clash-verge", "profiles", "config.yaml"),
+    ]
+    candidates.extend(path for path in windows_candidates if path is not None)
+    return candidates
+
+
+def _default_config_path() -> Path:
+    """Choose a readable fallback path for the current platform."""
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "clash" / "config.yaml"
+    if os.name == "nt":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            return Path(local_app_data) / "clash" / "config.yaml"
+    return Path.home() / ".config" / "clash" / "config.yaml"
 
 
 DEFAULT_URLS = [
@@ -15,17 +69,10 @@ DEFAULT_URLS = [
 ]
 SKIP_NODES = {"DIRECT", "REJECT"}
 DEFAULT_SELECTOR = "🔰 选择节点"
-DEFAULT_CLASH_CONFIG = Path.home() / ".config" / "clash" / "config.yaml"
+DEFAULT_CLASH_CONFIG = _default_config_path()
 DEFAULT_DELAY_URL = "https://chatgpt.com"
 US_MARKERS = ("美国", "US", "USA", "United States", "America")
-DEFAULT_CONFIG_CANDIDATES = [
-    Path.home() / ".config" / "clash" / "config.yaml",
-    Path.home() / ".config" / "mihomo" / "config.yaml",
-    Path.home() / ".local" / "share" / "io.github.clash-verge-rev.clash-verge-rev" / "config.yaml",
-    Path.home() / ".local" / "share" / "io.github.clash-verge-rev.clash-verge-rev" / "profiles" / "config.yaml",
-    Path.home() / ".local" / "share" / "clash-verge" / "config.yaml",
-    Path.home() / ".local" / "share" / "clash-verge" / "profiles" / "config.yaml",
-]
+DEFAULT_CONFIG_CANDIDATES = _default_config_candidates()
 
 
 def detect_vpn_context(proxy: str) -> list[str]:
