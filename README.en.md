@@ -1,49 +1,54 @@
-# autoprobe: 自动 Codex 代理选择
+# autoprobe
 
-[English](./README.en.md) | [故障排查](./TROUBLESHOOTING.md)
+[中文](./README.md) | [Troubleshooting](./TROUBLESHOOTING.en.md)
 
-> 梯子总是断断续续？
+> Proxy keeps dropping?
 >
-> Codex 卡在 `Reconnecting... 5/5` 还进不去？
+> Codex is stuck on `Reconnecting... 5/5`?
 >
-> 一键找到最合适的节点，开始你的 vibe code。
+> Find the best node quickly and get back to coding.
 
-`autoprobe` 会探测 Clash / Mihomo / Clash Verge 节点对 Codex / OpenAI 的连通性，并把你的 selector 自动切到表现最好的节点。
+`autoprobe` probes Clash / Mihomo / Clash Verge nodes for Codex / OpenAI connectivity and switches your selector to the best-performing node.
 
+It is designed for cases where:
 
-## 默认测试目标
+- `codex` CLI sometimes works but VS Code / Codex keeps reconnecting
+- `api.openai.com` is reachable on some nodes, while `chatgpt.com` or `ab.chatgpt.com` is unstable
+- you want a fast, repeatable way to rank nodes instead of testing them by hand
 
-默认会验证这些 URL：
+## What It Tests
+
+By default, `autoprobe` validates these URLs:
 
 - `https://chatgpt.com`
 - `https://ab.chatgpt.com`
 - `https://api.openai.com`
 - `https://auth.openai.com`
 
-只要拿到真实 HTTP 响应，就视为连接成功；超时、TLS reset 等错误会视为失败。
+It treats any real HTTP response as a successful connection and treats timeouts / TLS resets as failures.
 
-## 工作方式
+## How It Works
 
-`autoprobe` 使用两阶段策略：
+`autoprobe` uses a two-stage strategy:
 
-1. 并行预检
-   - 并行调用 Clash controller 的单节点 `delay` API
-   - 先做粗筛，不改动当前共享 selector
-2. 串行终检
-   - 只对预检里最好的节点切 selector
-   - 再用真实 `curl` 请求验证 OpenAI / Codex 相关域名
+1. Parallel precheck
+   - Calls the Clash controller per-node `delay` API in parallel
+   - Avoids changing the shared selector during coarse filtering
+2. Serial final validation
+   - Switches the selector only for the best prechecked nodes
+   - Runs real `curl` checks against OpenAI / Codex-related domains
 
-如果预检通过的节点数量不够，它会自动扩展候选池，而不是让失败节点直接混进最终验证。
+If not enough nodes pass the precheck, it automatically expands to additional candidates instead of allowing failed nodes into the finalist set.
 
-## 特性
+## Features
 
-- 支持 Clash for Windows / Mihomo / Clash Verge 风格配置
-- 自动识别常见配置路径
-- 在终端打印当前代理 / VPN 上下文
-- 默认优先考虑美国节点
-- 默认参数为 `--top 12 --finalists 5`
+- Supports Clash for Windows / Mihomo / Clash Verge style configs
+- Auto-detects common config paths
+- Prints detected proxy / VPN context to the terminal
+- Prefers US nodes by default
+- Defaults to `--top 12 --finalists 5`
 
-## 安装
+## Install
 
 Linux:
 
@@ -55,7 +60,7 @@ mkdir -p ~/.local/bin
 ln -sf "$PWD/autoprobe" ~/.local/bin/autoprobe
 ```
 
-可选 shell alias：
+Optional shell alias:
 
 ```bash
 echo 'autoprobe() { "$HOME/.local/bin/autoprobe" "$@"; }' >> ~/.bashrc
@@ -79,41 +84,41 @@ cd autoprobe
 .\autoprobe.cmd --dry-run
 ```
 
-你也可以把仓库目录加入 `PATH`，或者直接运行 `python .\autoprobe`。
+You can add the repo directory to `PATH`, or run it with `python .\autoprobe`.
 
-## 用法
+## Usage
 
-仅试跑，不切换节点：
+Dry run:
 
 ```bash
 autoprobe --dry-run
 ```
 
-直接使用默认参数：
+Use defaults:
 
 ```bash
 autoprobe
 ```
 
-显式指定 Clash Verge 配置文件：
+Specify a Clash Verge config explicitly:
 
 ```bash
 autoprobe --config ~/.local/share/io.github.clash-verge-rev.clash-verge-rev/config.yaml
 ```
 
-只测试一组自定义候选节点：
+Test a custom shortlist of nodes:
 
 ```bash
 autoprobe --nodes "🇺🇲 美国W02 | IEPL | x1.5" "🇯🇵 日本W01 | IEPL"
 ```
 
-## 故障排查
+## Troubleshooting
 
-详见 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)。
+See [TROUBLESHOOTING.en.md](./TROUBLESHOOTING.en.md).
 
-## 默认配置发现
+## Default Config Discovery
 
-脚本会按顺序尝试这些路径：
+The script tries these paths in order:
 
 - `~/.config/clash/config.yaml`
 - `~/.config/mihomo/config.yaml`
@@ -139,13 +144,13 @@ autoprobe --nodes "🇺🇲 美国W02 | IEPL | x1.5" "🇯🇵 日本W01 | IEPL"
 - `%APPDATA%\\clash-verge\\config.yaml`
 - `%APPDATA%\\clash-verge\\profiles\\config.yaml`
 
-你也可以随时用 `--config` 显式覆盖。
+You can always override this with `--config`.
 
-## 说明
+## Notes
 
-- 预检阶段可以安全并行，因为它不会改动共享 selector。
-- 终检阶段故意串行执行，因为 selector 切换本身是全局状态。
-- 高频率反复请求 `chatgpt.com` 可能触发 Cloudflare challenge，适合手动使用，不建议做成高频 cron。
+- The precheck phase is safe to parallelize because it does not mutate the shared selector.
+- The final validation phase is intentionally serial because selector switching is global state.
+- Repeated high-frequency probing against `chatgpt.com` may trigger Cloudflare challenges. Use it manually, not as a tight cron loop.
 
 ## Todo
 
